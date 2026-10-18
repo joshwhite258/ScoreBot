@@ -1,0 +1,9 @@
+[Unit]
+Description=ScoreBot update requested from Discord
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/bin/bash @SRC@/deploy/discord-update.sh
+StandardOutput=append:/var/log/scorebot-update.log
+StandardError=append:/var/log/scorebot-update.log

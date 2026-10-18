@@ -1,0 +1,21 @@
+[Unit]
+Description=ScoreBot Discord bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scorebot
+Group=scorebot
+WorkingDirectory=/opt/scorebot
+EnvironmentFile=/opt/scorebot/.env
+ExecStart=/opt/scorebot/venv/bin/python -m scorebot
+Restart=always
+RestartSec=10
+# light hardening
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
