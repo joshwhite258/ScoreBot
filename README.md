@@ -1,6 +1,8 @@
 # ScoreBot
 
-A self-hosted Discord bot for sports scores and NFL analytics. It posts live scores for six sports and runs its own NFL model, built from scratch in pure Python: win probabilities, projected scores, power rankings, and player stat projections, with an honest scorecard of how accurate it is.
+[![tests](https://github.com/joshwhite258/ScoreBot/actions/workflows/tests.yml/badge.svg)](https://github.com/joshwhite258/ScoreBot/actions/workflows/tests.yml)
+
+A self-hosted Discord bot for sports scores and NFL analytics. It posts live scores for seven sports and runs its own NFL model, built from scratch in pure Python: win probabilities, projected scores, power rankings, and player stat projections, with an honest scorecard of how accurate it is.
 
 It's built to run 24/7 in a Linux container, like the rest of my [home lab](https://github.com/joshwhite258/Homelab).
 
@@ -8,7 +10,8 @@ It's built to run 24/7 in a Linux container, like the rest of my [home lab](http
 
 | Command | What you get |
 |---|---|
-| `/scores` | Live scores and today's schedule for football, basketball, baseball, hockey, soccer and tennis. Filter by team, or look at yesterday and tomorrow. |
+| `/scores` | Live scores and today's schedule for the NFL, college football, basketball, baseball, hockey, soccer and tennis. Filter by team, or look at yesterday and tomorrow. |
+| `/live` | A live scoreboard and box score that edits itself in the channel every 30 seconds until the game ends: score, clock, who has the ball and the down and distance in football, and each team's standout players. Pick a sport, and optionally a team. Has a stop button. |
 | `/nfl predict` | This week's win chances, projected margins and scores. Add `team:` for the full breakdown, including quarterback changes. |
 | `/nfl power` | Power rankings from Elo plus offensive and defensive EPA per play. |
 | `/nfl player` | A player's projected stats for his next game, each with an 80% range. |
@@ -67,7 +70,8 @@ Some engineering details:
 - **Polite API client.** ESPN's CDN rejects bursts, so every call is spaced out, retried once on 403/429, and backs off for five minutes after repeated blocks rather than hammering the API.
 - **Background jobs.** The model rebuilds every 6 hours, injuries refresh every 20 minutes, and the preview checks every 30 minutes. Downloads are cached, and past seasons are only fetched once.
 - **Deploy from Discord.** The bot runs as an unprivileged user and can't restart itself. `/scorebot update` drops a request file, and a root systemd path unit sees it, pulls from GitHub, reinstalls, restarts, and leaves a result the bot posts back to the channel. A daily cron job does the same automatically.
-- **Tests.** Pytest covers the rating systems, the regression (it recovers known weights from synthetic data), player projections, scoreboard and injury parsing, the prediction log, the command tree and the updater script end to end.
+- **Live cards.** `/live` posts one message and edits it from a background task. Cards for the same sport share one scoreboard call, at most eight run at once, each stops after six hours or ten straight ESPN failures, and deleting the message stops it. They live in memory, so a restart ends them (the last edit stays in the channel).
+- **Tests and CI.** Every push and pull request runs the suite on GitHub Actions. Pytest covers the rating systems, the regression (it recovers known weights from synthetic data), player projections, scoreboard and injury parsing, the prediction log, the command tree and the updater script end to end.
 
 ## Running it
 
@@ -96,7 +100,7 @@ To deploy automatically, add `30 4 * * * bash /root/ScoreBot/deploy/auto-update.
 **Tests:**
 
 ```bash
-pip install -r requirements-dev.txt && python -m pytest
+pip install -r requirements-dev.txt && DISCORD_TOKEN=test python -m pytest
 ```
 
 ## Project layout
@@ -105,6 +109,7 @@ pip install -r requirements-dev.txt && python -m pytest
 scorebot/
   bot.py            client, background jobs
   scores.py         ESPN scoreboard parsing (team sports + tennis)
+  live.py           live game + box score parsing for /live
   espn.py           rate-limited ESPN client
   injuries.py       ESPN injury feed
   predictions.py    pre-kickoff prediction log + grading
@@ -116,6 +121,7 @@ scorebot/
     service.py      keeps models fresh, answers queries
   cogs/             slash commands
 deploy/             installer, systemd units, auto-update
+.github/workflows/  CI
 tests/
 ```
 

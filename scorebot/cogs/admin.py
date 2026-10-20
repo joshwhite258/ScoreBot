@@ -13,8 +13,9 @@ from .. import selfupdate
 log = logging.getLogger(__name__)
 
 HELP = """
-**Scores** (football, basketball, baseball, hockey, soccer, tennis)
+**Scores** (NFL, college football, basketball, baseball, hockey, soccer, tennis)
 `/scores` — live scores and today's schedule · add `team:` to filter, `day:` for yesterday/tomorrow
+`/live` — a scoreboard and box score card that updates itself until the game ends (not tennis) · `team:` to follow one team
 
 **NFL model**
 `/nfl predict` — this week's win chances, margins and projected scores · `team:` for the full breakdown

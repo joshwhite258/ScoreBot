@@ -85,7 +85,7 @@ def test_cogs_load_and_commands_register(tmp_path, monkeypatch):
         return names
 
     names = asyncio.run(run())
-    for want in ["scores", "injuries", "nfl predict", "nfl power", "nfl player", "nfl report",
+    for want in ["scores", "live", "injuries", "nfl predict", "nfl power", "nfl player", "nfl report",
                  "scorebot help", "scorebot status", "scorebot setchannel", "scorebot digest", "scorebot update"]:
         assert want in names, names
 

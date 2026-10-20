@@ -12,11 +12,15 @@ class Sport:
     name: str                      # "Baseball"
     emoji: str
     scoreboards: tuple[tuple[str, str], ...]   # (ESPN scoreboard URL, league label)
+    params: tuple[tuple[str, str], ...] = ()   # extra query params sent with every scoreboard call
 
 
 SOCCER_LEAGUES = (("eng.1", "Premier League"), ("uefa.champions", "Champions League"), ("usa.1", "MLS"))
 
 NFL = Sport("nfl", "Football", "🏈", ((f"{ESPN}/football/nfl/scoreboard", "NFL"),))
+# ESPN's college football scoreboard defaults to a short featured list; groups=80 is every FBS game.
+NCAAF = Sport("ncaaf", "College Football", "🏈", ((f"{ESPN}/football/college-football/scoreboard", "NCAAF"),),
+              params=(("groups", "80"), ("limit", "400")))
 NBA = Sport("nba", "Basketball", "🏀", ((f"{ESPN}/basketball/nba/scoreboard", "NBA"),))
 MLB = Sport("mlb", "Baseball", "⚾", ((f"{ESPN}/baseball/mlb/scoreboard", "MLB"),))
 NHL = Sport("nhl", "Hockey", "🏒", ((f"{ESPN}/hockey/nhl/scoreboard", "NHL"),))
@@ -25,7 +29,7 @@ SOCCER = Sport("soccer", "Soccer", "⚽",
 TENNIS = Sport("tennis", "Tennis", "🎾", ((f"{ESPN}/tennis/atp/scoreboard", "ATP"),
                                           (f"{ESPN}/tennis/wta/scoreboard", "WTA")))
 
-SPORTS: dict[str, Sport] = {s.key: s for s in (NFL, NBA, MLB, NHL, SOCCER, TENNIS)}
+SPORTS: dict[str, Sport] = {s.key: s for s in (NFL, NCAAF, NBA, MLB, NHL, SOCCER, TENNIS)}
 
 
 def get(key: str | None) -> Sport:

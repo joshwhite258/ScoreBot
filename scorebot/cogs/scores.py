@@ -11,6 +11,7 @@ from .. import scores as sc
 from .. import sports as sp
 
 SPORT_CHOICES = [app_commands.Choice(name=f"{s.emoji} {s.name}", value=s.key) for s in sp.SPORTS.values()]
+MAX_GAMES = 45          # a college football Saturday has 100+; an embed holds ~6000 characters
 DAY_CHOICES = [app_commands.Choice(name="Today", value=0), app_commands.Choice(name="Yesterday", value=-1),
                app_commands.Choice(name="Tomorrow", value=1)]
 
@@ -34,15 +35,17 @@ class Scores(commands.Cog):
         if not games:
             return await interaction.followup.send(f"{title}\nNo games found" + (f" for **{team}**." if team else "."))
         e = discord.Embed(title=title, color=0x3498DB)
+        shown = games[:MAX_GAMES]                      # live first, so a big college slate keeps what matters
         by_league: dict[str, list[str]] = {}
-        for g in games:
+        for g in shown:
             by_league.setdefault(g.league, []).append(sc.fmt_score(g, tz))
         for league, lines in by_league.items():
             for i in range(0, len(lines), 15):          # embed fields hold ~1024 chars
                 e.add_field(name=league if i == 0 else f"{league} (cont.)", value="\n".join(lines[i:i + 15]),
                             inline=False)
         live = sum(g.state == "in" for g in games)
-        e.set_footer(text=f"{len(games)} games · {live} live · source: ESPN")
+        more = f" · showing the first {len(shown)}, add team: to find the rest" if len(games) > len(shown) else ""
+        e.set_footer(text=f"{len(games)} games · {live} live{more} · source: ESPN")
         await interaction.followup.send(embed=e)
 
 
