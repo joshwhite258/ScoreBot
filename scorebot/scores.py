@@ -116,7 +116,8 @@ async def fetch_day(session: aiohttp.ClientSession, sport: sp.Sport, tz: ZoneInf
     games: list[Game] = []
     for url, league in sport.scoreboards:
         try:
-            games += parse_scoreboard(await get_json(session, url, {"dates": d}, timeout=15), league)
+            games += parse_scoreboard(
+                await get_json(session, url, {"dates": d, **dict(sport.params)}, timeout=15), league)
         except EspnBlocked as e:
             log.warning("ESPN scores stopped: %s", e)
             break
