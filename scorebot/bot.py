@@ -16,7 +16,7 @@ from .models.service import ModelService
 
 log = logging.getLogger("scorebot")
 
-COGS = ["scorebot.cogs.scores", "scorebot.cogs.live", "scorebot.cogs.nfl", "scorebot.cogs.injuries", "scorebot.cogs.admin"]
+COGS = ["scorebot.cogs.scores", "scorebot.cogs.live", "scorebot.cogs.form", "scorebot.cogs.nfl", "scorebot.cogs.injuries", "scorebot.cogs.admin"]
 
 
 class ScoreBot(commands.Bot):
