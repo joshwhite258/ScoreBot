@@ -12,6 +12,7 @@ It's built to run 24/7 in a Linux container, like the rest of my [home lab](http
 |---|---|
 | `/scores` | Live scores and today's schedule for the NFL, college football, basketball, baseball, hockey, soccer and tennis. Filter by team, or look at yesterday and tomorrow. |
 | `/live` | A live scoreboard and box score that edits itself in the channel every 30 seconds until the game ends: score, clock, who has the ball and the down and distance in football, and each team's standout players. Pick a sport, and optionally a team. Has a stop button. |
+| `/form` | A player's last 5 games (1–10 with `games:`) and his averages for NBA, NHL and MLB, from ESPN box scores. Handles `Jamal Murray` or `J. Murray`, asks which one if several match, and flags injuries. |
 | `/nfl predict` | This week's win chances, projected margins and scores. Add `team:` for the full breakdown, including quarterback changes. |
 | `/nfl power` | Power rankings from Elo plus offensive and defensive EPA per play. |
 | `/nfl player` | A player's projected stats for his next game, each with an 80% range. |
@@ -110,6 +111,7 @@ scorebot/
   bot.py            client, background jobs
   scores.py         ESPN scoreboard parsing (team sports + tennis)
   live.py           live game + box score parsing for /live
+  form.py           player search, recent box scores and averages for /form
   espn.py           rate-limited ESPN client
   injuries.py       ESPN injury feed
   predictions.py    pre-kickoff prediction log + grading
