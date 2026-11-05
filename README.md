@@ -14,6 +14,7 @@ It's built to run 24/7 in a Linux container, like the rest of my [home lab](http
 | `/live` | A live scoreboard and box score that edits itself in the channel every 30 seconds until the game ends: score, clock, who has the ball and the down and distance in football, and each team's standout players. Pick a sport, and optionally a team. Has a stop button. |
 | `/form` | A player's last 5 games (1–10 with `games:`) and his averages for NBA, NHL and MLB, from ESPN box scores. Handles `Jamal Murray` or `J. Murray`, asks which one if several match, and flags injuries. |
 | `/nfl predict` | This week's win chances, projected margins and scores. Add `team:` for the full breakdown, including quarterback changes. |
+| `/nfl simulate` | Plays a team's next game up to 100,000 times, drive by drive: win and overtime chances, the most common final scores, how often it's a blowout, and each starter's realistic range (average and 10–90%), with a menu for any player's full breakdown. |
 | `/nfl power` | Power rankings from Elo plus offensive and defensive EPA per play. |
 | `/nfl player` | A player's projected stats for his next game, each with an 80% range. |
 | `/nfl report` | Backtest accuracy against simpler baselines, calibration, player-projection error, and the live track record. |
@@ -35,6 +36,10 @@ Everything is computed from public NFL data ([nflverse](https://github.com/nflve
 **Win probability** blends those three with a logistic regression, written as Newton–Raphson with L2 regularisation. **Projected margin** maps that probability through the spread of NFL results (SD ≈ 13.5 points). **Projected total** comes from exponentially weighted points scored and allowed, linearly calibrated on history.
 
 **Player projections** use a player's recent per-game production, shrunk toward his position's average, then scaled by what the opponent's defense allows relative to the league and by how many points the team model projects his team to score. Yardage gets a normal distribution with an error that grows with the projection. Counts like receptions and touchdowns get a Poisson distribution. Those distributions produce the 80% range.
+
+### Game simulator (`/nfl simulate`)
+
+The model gives one projected score; the simulator shows the whole range around it. Each simulated game is played drive by drive: a drive ends in a touchdown, a field goal (made or missed), a turnover (sometimes returned for a score), a safety or a punt. Scoring chances are calibrated so that, over many games, each team averages what the model projects and margins spread out like real NFL results. Yards and touchdowns are handed to the quarterback, running backs and receivers in proportion to the player model's projections, so every game has a full box score, and players listed out on ESPN's injury report are left out. Runs are seeded, so any single simulated game can be replayed exactly. Standard library only; a 20,000-game run takes a couple of seconds.
 
 ### How good is it?
 

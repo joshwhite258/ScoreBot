@@ -1,5 +1,8 @@
-"""/nfl predict, power, player, report: the NFL model's projections and how well it's doing."""
+"""/nfl predict, simulate, power, player, report: the NFL model's projections and how well it's doing."""
 from __future__ import annotations
+
+import asyncio
+import random
 
 import discord
 from discord import app_commands
@@ -7,6 +10,7 @@ from discord.ext import commands
 
 from .. import predictions
 from ..digest import matchup_line
+from ..models import gamesim as gs
 from ..models import nflverse as nv
 from ..models.players import LABELS
 from ..names import resolve
@@ -71,6 +75,26 @@ class NFL(commands.GroupCog, group_name="nfl", group_description="NFL projection
                 qbs.append(f"{p[side]}: {name} ({p[f'{side}_qb_src']})")
         e.add_field(name="Quarterbacks", value="\n".join(qbs), inline=False)
         await interaction.followup.send(embed=e)
+
+    # --------------------------------------------------------- /nfl simulate
+    @app_commands.command(name="simulate", description="Play a team's next game thousands of times: outcomes and player ranges")
+    @app_commands.describe(team="Team (e.g. BUF, Bills)", runs="How many games to play (1,000-100,000, default 20,000)")
+    async def simulate(self, interaction: discord.Interaction, team: str,
+                       runs: app_commands.Range[int, 1000, gs.MAX_RUNS] = 20000):
+        await interaction.response.defer()
+        if not await self._ready(interaction):
+            return
+        svc = self.bot.model
+        code = nv.NAME_TO_CODE.get(resolve(team) or "")
+        game = svc.next_game(code) if code else None
+        if not game:
+            return await interaction.followup.send(f"Couldn't find an upcoming game for **{team}**.")
+        sg = gs.build_game(svc, game)
+        if sg is None:
+            return await interaction.followup.send("No model prediction for that game yet.")
+        seed = random.randrange(1, 10 ** 6)
+        s = await asyncio.to_thread(gs.simulate, sg, runs, seed)
+        await interaction.followup.send(embed=sim_embed(sg, s, game), view=SimView(s))
 
     # ------------------------------------------------------------ /nfl power
     @app_commands.command(name="power", description="Power rankings: Elo + EPA per play")
@@ -147,6 +171,93 @@ class NFL(commands.GroupCog, group_name="nfl", group_description="NFL projection
                            f"avg margin miss {live['margin_mae']:.1f} · total miss {live['total_mae']:.1f}"
                            if live.get("games") else "No graded games yet. Predictions are logged every 6 hours."))
         await interaction.followup.send(embed=e)
+
+
+# ------------------------------------------------------------------ /nfl simulate output
+POS_ORDER = {"QB": 0, "RB": 1, "WR": 2, "TE": 3}
+MAIN_STATS = {"QB": ("pass_yds", "pass_td"), "RB": ("rush_yds", "td"),
+              "WR": ("rec_yds", "rec", "td"), "TE": ("rec_yds", "rec", "td")}
+
+
+def _rng(row: dict) -> str:
+    q = row["q"]
+    return f"{row['mean']:.0f} ({q[0]:.0f}-{q[4]:.0f})"
+
+
+def player_line(name: str, p: dict) -> str:
+    bits = []
+    for k in MAIN_STATS.get(p["pos"], ("rec_yds", "rec", "td")):
+        if k not in p:
+            continue
+        if k == "td":
+            bits.append(f"TD {p[k]['p_any']:.0%}")
+        elif k in ("pass_td", "rec"):
+            bits.append(f"{p[k]['mean']:.1f} {gs.STAT_LABEL[k]}")
+        else:
+            bits.append(f"{_rng(p[k])} {gs.STAT_LABEL[k]}")
+    return f"**{name}** ({p['pos']}): " + ", ".join(bits)
+
+
+def sim_embed(sg: gs.SimGame, s: dict, game: dict) -> discord.Embed:
+    h, a = sg.home, sg.away
+    e = discord.Embed(title=f"🎲 {a} @ {h} · {s['n']:,} simulated games",
+                      description=f"Week {game['week']} · {game.get('gameday') or ''}", color=0x8E44AD)
+    e.add_field(name="Win chance", inline=False,
+                value=f"{h} **{s['home_win']:.1%}** · {a} **{s['away_win']:.1%}** · went to OT {s['ot']:.1%}")
+    finals = ", ".join(f"{x}-{y} ({p:.1%})" for x, y, p in s["top_scores"])
+    e.add_field(name="Typical final", inline=False,
+                value=f"{a} {s['avg_away']:.1f} - {s['avg_home']:.1f} {h} (averages) · total {s['total_mean']:.1f} "
+                      f"± {s['total_sd']:.1f}\nMost common finals ({a}-{h}): {finals}")
+    b = gs.margin_buckets(s)
+    e.add_field(name="How it ends", inline=False, value="\n".join(
+        f"{k.replace('home', h).replace('away', a)}: {v:.0%}" for k, v in b.items() if v >= 0.005))
+    for side, code in (("away", a), ("home", h)):
+        rows = sorted(((n, p) for n, p in s["players"].items() if p["team"] == side),
+                      key=lambda x: POS_ORDER.get(x[1]["pos"], 9))
+        if rows:
+            e.add_field(name=f"{code} players (average, 10-90% range)", inline=False,
+                        value="\n".join(player_line(n, p) for n, p in rows)[:1024])
+    if sg.notes:
+        e.add_field(name="Notes", value="\n".join(sg.notes)[:1024], inline=False)
+    e.set_footer(text="Each game is played drive by drive from ScoreBot's model; pick a player below for the full "
+                      "breakdown. It spreads out what the model believes; it can't know more than the model does.")
+    return e
+
+
+def player_embed(name: str, p: dict, n: int) -> discord.Embed:
+    e = discord.Embed(title=f"👤 {name} ({p['pos']}) · {n:,} simulated games", color=0x8E44AD)
+    for k in gs.STATS:
+        if k not in p or (p["pos"] == "QB" and k == "rush_yds"):     # QB scrambles aren't modelled yet
+            continue
+        r = p[k]
+        q = r["q"]
+        e.add_field(name=gs.STAT_LABEL[k], inline=True,
+                    value=f"avg **{r['mean']:.1f}**\nmedian {q[2]:.0f}\n10-90%: {q[0]:.0f}-{q[4]:.0f}\n"
+                          f"1 or more: {r['p_any']:.0%}")
+    return e
+
+
+class PlayerSelect(discord.ui.Select):
+    def __init__(self, s: dict):
+        names = sorted(s["players"], key=lambda n: (s["players"][n]["team"], POS_ORDER.get(s["players"][n]["pos"], 9)))
+        opts = [discord.SelectOption(label=f"{n} ({s['players'][n]['pos']})"[:100], value=n[:100]) for n in names[:25]]
+        super().__init__(placeholder="🔍 Pick a player for the full breakdown", options=opts or
+                         [discord.SelectOption(label="No players", value="_")])
+        self.s = s
+
+    async def callback(self, interaction: discord.Interaction):
+        name = self.values[0]
+        if name not in self.s["players"]:
+            return await interaction.response.send_message("No players in this sim.", ephemeral=True)
+        await interaction.response.send_message(embed=player_embed(name, self.s["players"][name], self.s["n"]),
+                                                ephemeral=True)
+
+
+class SimView(discord.ui.View):
+    def __init__(self, s: dict):
+        super().__init__(timeout=1800)
+        if s["players"]:
+            self.add_item(PlayerSelect(s))
 
 
 async def setup(bot):
